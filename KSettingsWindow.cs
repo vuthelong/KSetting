@@ -17,9 +17,12 @@ namespace Kingfisher.KSetting
         private const float HeaderHeight = 40;
         private const float RowHeight = 22;
         private const float Padding = 10;
+        private const float ToggleWidth = 76;
+        private const float ButtonHeight = 18;
 
         // Styles
         private static GUIStyle _titleStyle;
+        private static GUIStyle _dangerButtonStyle;
         private static GUIStyle _sidebarHeaderStyle;
         private static GUIStyle _sidebarItemStyle;
         private static GUIStyle _sidebarItemSelectedStyle;
@@ -46,6 +49,7 @@ namespace Kingfisher.KSetting
         private static Color DividerColor => IsDark ? Greyscale(.13f) : Greyscale(.6f);
         private static Color RowStripe => Greyscale(IsDark ? 1 : 0, .025f);
         private static Color RowHover => Greyscale(IsDark ? 1 : 0, .05f);
+        private static Color DangerTint => IsDark ? new Color(1.35f, .62f, .58f) : new Color(1.3f, .72f, .68f);
 
         #endregion
 
@@ -92,7 +96,7 @@ namespace Kingfisher.KSetting
 
         #region Public Methods
 
-        [MenuItem("Tools/Kingfisher/Settings", false, 0)]
+        [MenuItem("Tools/KTools Setting", false, 0)]
         public static void Open()
         {
             KTools.Rediscover();
@@ -202,6 +206,8 @@ namespace Kingfisher.KSetting
 
                     if (entry.IsChoice)
                         DrawChoice(entry, ref rowIndex);
+                    else if (entry.Settings[0].IsSlider)
+                        DrawSliderRow(entry.Settings[0], rowIndex++);
                     else
                         DrawToggleRow(entry.Settings[0], rowIndex++);
                 }
@@ -247,6 +253,20 @@ namespace Kingfisher.KSetting
             Apply(setting, newValue);
         }
 
+        private void DrawSliderRow(KToolSetting setting, int rowIndex)
+        {
+            var rect = BeginRow(rowIndex);
+            var sliderRect = new Rect(rect.x + Padding, rect.y + 2, rect.width - Padding * 2, rect.height - 4);
+            var value = setting.SliderValue;
+            var newValue = EditorGUI.Slider(sliderRect, setting.Label, value, setting.Min, setting.Max);
+
+            if (Mathf.Approximately(newValue, value)) return;
+
+            setting.SliderValue = newValue;
+
+            InternalEditorUtility.RepaintAllViews();
+        }
+
         private Rect BeginRow(int rowIndex)
         {
             var rect = GUILayoutUtility.GetRect(0, RowHeight, GUILayout.ExpandWidth(true));
@@ -267,17 +287,83 @@ namespace Kingfisher.KSetting
             GUI.Label(new Rect(rect.x + Padding, rect.y, rect.width - Padding, rect.height), tool.Name, _titleStyle);
 
             DrawEnabledToggle(rect, tool);
+            DrawResetButtons(rect, tool);
 
             EditorGUI.DrawRect(new Rect(rect.x, rect.yMax - 1, rect.width, 1), DividerColor);
+        }
+
+        private void DrawResetButtons(Rect headerRect, KTool tool)
+        {
+            const float deleteWidth = 82f;
+            const float resetWidth = 92f;
+            const float gap = 6f;
+
+            var right = headerRect.xMax - Padding - (tool.DisabledSetting != null ? ToggleWidth + gap : 0);
+            var y = headerRect.y + (headerRect.height - ButtonHeight) / 2;
+
+            if (tool.CanDeleteData)
+            {
+                var deleteRect = new Rect(right - deleteWidth, y, deleteWidth, ButtonHeight);
+                var previousBackground = GUI.backgroundColor;
+
+                GUI.backgroundColor = DangerTint;
+
+                if (GUI.Button(deleteRect, "Delete data", _dangerButtonStyle))
+                    ConfirmDeleteData(tool);
+
+                GUI.backgroundColor = previousBackground;
+
+                right = deleteRect.x - gap;
+            }
+
+            var resetRect = new Rect(right - resetWidth, y, resetWidth, ButtonHeight);
+
+            if (GUI.Button(resetRect, "Reset settings", EditorStyles.miniButton))
+                ConfirmResetSettings(tool);
+        }
+
+        private void ConfirmDeleteData(KTool tool)
+        {
+            var files = new List<string>();
+
+            tool.CollectStoredDataFiles(files);
+
+            var body = files.Count == 0
+                ? $"{tool.Name} has nothing saved in .KData right now.\n\nIts in-memory copy will still be cleared."
+                : $"This permanently deletes:\n\n{string.Join("\n", files)}\n\nfrom {KData.RelativeFolderPath}. It cannot be undone.";
+
+            if (!EditorUtility.DisplayDialog($"Delete {tool.Name} data?", body, "Delete", "Cancel")) return;
+
+            // Off the GUI stack - the dialog already interrupted this OnGUI pass.
+            EditorApplication.delayCall += () =>
+            {
+                tool.DeleteData();
+
+                Repaint();
+            };
+        }
+
+        private void ConfirmResetSettings(KTool tool)
+        {
+            var body = $"This puts every {tool.Name} setting back to its default.\n\n" +
+                       "Saved data in .KData is left alone. Settings are stored per project and per machine, so both copies are cleared, and scripts will reload.";
+
+            if (!EditorUtility.DisplayDialog($"Reset {tool.Name} settings?", body, "Reset", "Cancel")) return;
+
+            EditorApplication.delayCall += () =>
+            {
+                tool.ResetSettings();
+
+                // The tools cache settings in statics that only a reload clears.
+                EditorUtility.RequestScriptReload();
+            };
         }
 
         private void DrawEnabledToggle(Rect headerRect, KTool tool)
         {
             if (tool.DisabledSetting is not { } disabledSetting) return;
 
-            const float toggleWidth = 76f;
-
-            var toggleRect = new Rect(headerRect.xMax - toggleWidth - Padding, headerRect.y + (headerRect.height - 18) / 2, toggleWidth, 18);
+            var toggleRect = new Rect(headerRect.xMax - ToggleWidth - Padding, headerRect.y + (headerRect.height - ButtonHeight) / 2, ToggleWidth, ButtonHeight);
             var isEnabled = !disabledSetting.Value;
             var newIsEnabled = EditorGUI.ToggleLeft(toggleRect, "Enabled", isEnabled);
 
@@ -323,6 +409,13 @@ namespace Kingfisher.KSetting
             _stylesAreDark = IsDark;
 
             _titleStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 14, alignment = TextAnchor.MiddleLeft };
+
+            var dangerText = IsDark ? new Color(1f, .78f, .75f) : new Color(.42f, .06f, .04f);
+
+            _dangerButtonStyle = new GUIStyle(EditorStyles.miniButton);
+            _dangerButtonStyle.normal.textColor = dangerText;
+            _dangerButtonStyle.hover.textColor = dangerText;
+            _dangerButtonStyle.active.textColor = dangerText;
 
             _sidebarHeaderStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleLeft };
             _sidebarHeaderStyle.normal.textColor = Greyscale(IsDark ? 1 : 0, .4f);

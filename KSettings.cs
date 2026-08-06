@@ -42,9 +42,42 @@ namespace Kingfisher.KSetting
 
         public static void Save() => KData.Save(Data, FileName);
 
+        public static void RemoveByPrefix(string prefix, List<string> removedKeys)
+        {
+            var removed = Remove(Data.boolKeys, Data.bools, prefix, removedKeys);
+
+            removed |= Remove(Data.intKeys, Data.ints, prefix, removedKeys);
+            removed |= Remove(Data.floatKeys, Data.floats, prefix, removedKeys);
+
+            if (!removed) return;
+
+            Save();
+        }
+
         #endregion
 
         #region Private Methods
+
+        private static bool Remove<T>(List<string> keys, List<T> values, string prefix, List<string> removedKeys)
+        {
+            var removed = false;
+
+            for (var i = keys.Count - 1; i >= 0; i--)
+            {
+                if (!keys[i].StartsWith(prefix, System.StringComparison.Ordinal)) continue;
+
+                removedKeys?.Add(keys[i]);
+
+                keys.RemoveAt(i);
+
+                if (i < values.Count)
+                    values.RemoveAt(i);
+
+                removed = true;
+            }
+
+            return removed;
+        }
 
         private static T Get<T>(List<string> keys, List<T> values, string key, T defaultValue)
         {

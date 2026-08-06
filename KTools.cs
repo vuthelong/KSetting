@@ -1,8 +1,11 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Reflection;
 using System.Text;
+using UnityEditor;
 
 namespace Kingfisher.KSetting
 {
@@ -55,6 +58,9 @@ namespace Kingfisher.KSetting
 
         private const string DisabledPropertyName = "PluginDisabled";
         private const string LayoutFieldName = "SettingsLayout";
+        private const string DeleteDataMethodName = "DeleteData";
+
+        private readonly MethodInfo _deleteDataMethod;
 
         #endregion
 
@@ -66,6 +72,9 @@ namespace Kingfisher.KSetting
 
         public KToolSetting DisabledSetting { get; }
 
+        // K-Tabs keeps nothing of its own in .KData, so it gets no delete button.
+        public bool CanDeleteData => this._deleteDataMethod != null;
+
         #endregion
 
         #region Constructor
@@ -74,15 +83,20 @@ namespace Kingfisher.KSetting
         {
             Name = name;
 
+            this._deleteDataMethod = menuType.GetMethod(DeleteDataMethodName, BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
+
             var propertiesByName = new Dictionary<string, PropertyInfo>();
             var declarationOrder = new List<string>();
 
             foreach (var property in menuType.GetProperties(BindingFlags.Public | BindingFlags.Static))
             {
-                if (property.PropertyType != typeof(bool)) continue;
                 if (!property.CanRead || !property.CanWrite) continue;
 
-                if (property.Name == DisabledPropertyName)
+                var isBool = property.PropertyType == typeof(bool);
+
+                if (!isBool && property.PropertyType != typeof(float)) continue;
+
+                if (isBool && property.Name == DisabledPropertyName)
                 {
                     DisabledSetting = new KToolSetting(property);
 
@@ -90,7 +104,11 @@ namespace Kingfisher.KSetting
                 }
 
                 propertiesByName[property.Name] = property;
-                declarationOrder.Add(property.Name);
+
+                // Sliders are only drawn where the layout asks for one, so they
+                // stay out of the leftover "Other" section.
+                if (isBool)
+                    declarationOrder.Add(property.Name);
             }
 
             BuildSections(menuType, propertiesByName, declarationOrder);
@@ -98,7 +116,55 @@ namespace Kingfisher.KSetting
 
         #endregion
 
+        #region Public Methods
+
+        public void DeleteData() => this._deleteDataMethod?.Invoke(null, null);
+
+        public void CollectStoredDataFiles(List<string> results)
+        {
+            results.Clear();
+
+            if (!Directory.Exists(KData.FolderPath)) return;
+
+            var filePaths = Directory.GetFiles(KData.FolderPath);
+
+            for (var i = 0; i < filePaths.Length; i++)
+            {
+                var fileName = Path.GetFileName(filePaths[i]);
+
+                if (!fileName.StartsWith(Name, StringComparison.Ordinal)) continue;
+
+                results.Add(fileName);
+            }
+        }
+
+        // Deleting the keys rather than writing false back: the tools pick their
+        // own defaults when a key is missing, and not every default is false.
+        public void ResetSettings()
+        {
+            var removedKeys = new List<string>();
+
+            KSettings.RemoveByPrefix(Name + "-", removedKeys);
+
+            for (var i = 0; i < removedKeys.Count; i++)
+                DeleteEditorPrefsKey(removedKeys[i]);
+        }
+
+        #endregion
+
         #region Private Methods
+
+        private static void DeleteEditorPrefsKey(string key)
+        {
+            EditorPrefs.DeleteKey(key);
+
+            // The tools fall back to these pre-rename keys whenever the current
+            // one is missing, so leaving them behind would restore the old value.
+            var previous = key.Substring(1);
+
+            EditorPrefs.DeleteKey(previous);
+            EditorPrefs.DeleteKey("v" + previous.Replace("-kingfisher-", "-vtools-"));
+        }
 
         private void BuildSections(Type menuType, Dictionary<string, PropertyInfo> propertiesByName, List<string> declarationOrder)
         {
@@ -128,6 +194,17 @@ namespace Kingfisher.KSetting
                         Sections.Add(section);
 
                     section = new KToolSection(line.Substring(1).Trim());
+                    choice = null;
+
+                    continue;
+                }
+
+                var isSlider = line[0] == '~';
+
+                if (isSlider)
+                {
+                    AddSlider(section, line.Substring(1), propertiesByName, placed);
+
                     choice = null;
 
                     continue;
@@ -174,6 +251,25 @@ namespace Kingfisher.KSetting
                     leftovers.Add(declarationOrder[i]);
 
             AddSection("Other", leftovers, propertiesByName);
+        }
+
+        // "~PropertyName|Label|min|max"
+        private static void AddSlider(KToolSection section, string body, Dictionary<string, PropertyInfo> propertiesByName, HashSet<string> placed)
+        {
+            var parts = body.Split('|');
+
+            if (parts.Length < 4) return;
+
+            var propertyName = parts[0].Trim();
+
+            if (!propertiesByName.TryGetValue(propertyName, out var property)) return;
+
+            if (!float.TryParse(parts[2].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var min)) return;
+            if (!float.TryParse(parts[3].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var max)) return;
+
+            placed.Add(propertyName);
+
+            section.Entries.Add(new KToolEntry(new KToolSetting(property, parts[1].Trim(), min, max)));
         }
 
         private void AddSection(string title, List<string> propertyNames, Dictionary<string, PropertyInfo> propertiesByName)
@@ -245,9 +341,21 @@ namespace Kingfisher.KSetting
 
         public string Label { get; }
 
+        public bool IsSlider { get; }
+
+        public float Min { get; }
+
+        public float Max { get; }
+
         public bool Value
         {
             get => (bool)this._property.GetValue(null);
+            set => this._property.SetValue(null, value);
+        }
+
+        public float SliderValue
+        {
+            get => (float)this._property.GetValue(null);
             set => this._property.SetValue(null, value);
         }
 
@@ -260,6 +368,16 @@ namespace Kingfisher.KSetting
             this._property = property;
 
             Label = label ?? Prettify(property.Name);
+        }
+
+        public KToolSetting(PropertyInfo property, string label, float min, float max)
+        {
+            this._property = property;
+
+            Label = label ?? Prettify(property.Name);
+            IsSlider = true;
+            Min = min;
+            Max = max;
         }
 
         #endregion
