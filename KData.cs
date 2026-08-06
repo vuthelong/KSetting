@@ -1,6 +1,5 @@
 #if UNITY_EDITOR
 using System.IO;
-using System.Runtime.CompilerServices;
 using UnityEditorInternal;
 using UnityEngine;
 
@@ -10,7 +9,13 @@ namespace Kingfisher.KSetting
     {
         #region Fields
 
-        private const string InstallFolderPath = "Assets/ThirdParty/KingfisherTools";
+        private const string FolderName = ".KData";
+
+        private const string GitIgnoreFileName = ".gitignore";
+
+        private const string GitIgnoreContents = "# Kingfisher Tools editor data - local to this machine.\n" +
+                                                 "# Delete this file to commit the folder instead.\n" +
+                                                 "*\n";
 
         private static string _folderPath;
 
@@ -18,7 +23,9 @@ namespace Kingfisher.KSetting
 
         #region Properties
 
-        public static string FolderPath => _folderPath ??= KSettingFolderPath().GetParentPath().CombinePath(".KData");
+        public static string FolderPath => _folderPath ??= Application.dataPath.GetParentPath().CombinePath(FolderName);
+
+        public static string RelativeFolderPath => FolderName;
 
         #endregion
 
@@ -58,7 +65,7 @@ namespace Kingfisher.KSetting
         {
             if (!asset) return;
 
-            Directory.CreateDirectory(FolderPath);
+            EnsureFolder();
 
             InternalEditorUtility.SaveToSerializedFileAndForget(new[] { asset }, GetFilePath(fileName), allowTextSerialization: true);
         }
@@ -67,19 +74,15 @@ namespace Kingfisher.KSetting
 
         #region Private Methods
 
-        private static string KSettingFolderPath([CallerFilePath] string callerPath = "")
+        private static void EnsureFolder()
         {
-            var path = callerPath.Replace('\\', '/').GetParentPath();
+            Directory.CreateDirectory(FolderPath);
 
-            var assetsIndex = path.LastIndexOf("/Assets/", System.StringComparison.Ordinal);
+            var gitIgnorePath = FolderPath.CombinePath(GitIgnoreFileName);
 
-            if (assetsIndex != -1) return path.Substring(assetsIndex + 1);
+            if (File.Exists(gitIgnorePath)) return;
 
-            // Installed as a package, so callerPath points inside
-            // Library/PackageCache - which Unity wipes on every package update.
-            // Save into the project at the same place the .unitypackage installs
-            // use, so data survives updates and carries over between the two.
-            return InstallFolderPath.CombinePath(path.Substring(path.LastIndexOf('/') + 1));
+            File.WriteAllText(gitIgnorePath, GitIgnoreContents);
         }
 
         private static string GetParentPath(this string path) => path.LastIndexOf('/') is var i && i > 0 ? path.Substring(0, i) : path;

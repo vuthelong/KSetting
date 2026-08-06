@@ -295,7 +295,7 @@ namespace Kingfisher.KSetting
 
             var folderPath = KData.FolderPath;
 
-            GUI.Label(new Rect(rect.x + Padding, rect.y, rect.width - buttonWidth - Padding * 3, rect.height), folderPath, _footerStyle);
+            GUI.Label(new Rect(rect.x + Padding, rect.y, rect.width - buttonWidth - Padding * 3, rect.height), KData.RelativeFolderPath, _footerStyle);
 
             var buttonRect = new Rect(rect.xMax - buttonWidth - Padding, rect.y + 4, buttonWidth, rect.height - 9);
 
