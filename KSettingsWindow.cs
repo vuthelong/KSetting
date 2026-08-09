@@ -58,6 +58,7 @@ namespace Kingfisher.KSetting
         private const float FooterButtonInset = 9f;
 
         private const int TitleFontSize = 14;
+        private const int RadioButtonShift = 4;
         private const int NoPendingTool = -1;
 
         private const float LightSelectionBoost = 1.2f;
@@ -102,6 +103,7 @@ namespace Kingfisher.KSetting
         private static GUIStyle _sidebarItemStyle;
         private static GUIStyle _sidebarItemSelectedStyle;
         private static GUIStyle _sectionStyle;
+        private static GUIStyle _radioStyle;
         private static GUIStyle _footerStyle;
         private static GUIStyle _emptyStyle;
         private static bool _hasBuiltStyles;
@@ -320,9 +322,9 @@ namespace Kingfisher.KSetting
             {
                 var option = entry.Settings[i];
                 var rect = BeginRow(rowIndex++);
-                var optionRect = new Rect(rect.x + Padding + ChoiceIndent, rect.y + RowInset, rect.width - Padding * 2f - ChoiceIndent, rect.height - RowInset * 2f);
+                var optionRect = new Rect(rect.x + Padding + ChoiceIndent - RadioButtonShift, rect.y + RowInset, rect.width - Padding * 2f - ChoiceIndent + RadioButtonShift, rect.height - RowInset * 2f);
 
-                if (!GUI.Toggle(optionRect, option.Value, option.Label, EditorStyles.radioButton)) continue;
+                if (!GUI.Toggle(optionRect, option.Value, option.Label, _radioStyle)) continue;
 
                 if (option.Value) continue;
 
@@ -522,6 +524,9 @@ namespace Kingfisher.KSetting
 
             _sectionStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleLeft, fontStyle = FontStyle.Bold };
             _sectionStyle.normal.textColor = GetSkinTextColor(SectionTextAlpha);
+
+            _radioStyle = new GUIStyle(EditorStyles.radioButton);
+            _radioStyle.padding.left += RadioButtonShift;
 
             _footerStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.MiddleLeft };
             _footerStyle.normal.textColor = GetSkinTextColor(FooterTextAlpha);
