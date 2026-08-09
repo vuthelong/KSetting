@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,7 +7,7 @@ namespace Kingfisher.KSetting
 {
     public static class KSettings
     {
-        #region Fields
+        #region Field
 
         public const string FileName = "KSettings.asset";
 
@@ -14,13 +15,13 @@ namespace Kingfisher.KSetting
 
         #endregion
 
-        #region Properties
+        #region Property
 
         private static KSettingsData Data => _data ? _data : _data = KData.LoadOrCreate<KSettingsData>(FileName);
 
         #endregion
 
-        #region Public Methods
+        #region Setting Access
 
         public static bool HasBool(string key) => Data.boolKeys.Contains(key);
 
@@ -39,45 +40,6 @@ namespace Kingfisher.KSetting
         public static void SetInt(string key, int value) => Set(Data.intKeys, Data.ints, key, value);
 
         public static void SetFloat(string key, float value) => Set(Data.floatKeys, Data.floats, key, value);
-
-        public static void Save() => KData.Save(Data, FileName);
-
-        public static void RemoveByPrefix(string prefix, List<string> removedKeys)
-        {
-            var removed = Remove(Data.boolKeys, Data.bools, prefix, removedKeys);
-
-            removed |= Remove(Data.intKeys, Data.ints, prefix, removedKeys);
-            removed |= Remove(Data.floatKeys, Data.floats, prefix, removedKeys);
-
-            if (!removed) return;
-
-            Save();
-        }
-
-        #endregion
-
-        #region Private Methods
-
-        private static bool Remove<T>(List<string> keys, List<T> values, string prefix, List<string> removedKeys)
-        {
-            var removed = false;
-
-            for (var i = keys.Count - 1; i >= 0; i--)
-            {
-                if (!keys[i].StartsWith(prefix, System.StringComparison.Ordinal)) continue;
-
-                removedKeys?.Add(keys[i]);
-
-                keys.RemoveAt(i);
-
-                if (i < values.Count)
-                    values.RemoveAt(i);
-
-                removed = true;
-            }
-
-            return removed;
-        }
 
         private static T Get<T>(List<string> keys, List<T> values, string key, T defaultValue)
         {
@@ -108,21 +70,59 @@ namespace Kingfisher.KSetting
         }
 
         #endregion
+
+        #region Persistence
+
+        public static void Save() => KData.Save(Data, FileName);
+
+        public static void RemoveByPrefix(string prefix, List<string> removedKeys)
+        {
+            var removed = Remove(Data.boolKeys, Data.bools, prefix, removedKeys);
+
+            removed |= Remove(Data.intKeys, Data.ints, prefix, removedKeys);
+            removed |= Remove(Data.floatKeys, Data.floats, prefix, removedKeys);
+
+            if (!removed) return;
+
+            Save();
+        }
+
+        private static bool Remove<T>(List<string> keys, List<T> values, string prefix, List<string> removedKeys)
+        {
+            var removed = false;
+
+            for (var i = keys.Count - 1; i >= 0; i--)
+            {
+                if (!keys[i].StartsWith(prefix, StringComparison.Ordinal)) continue;
+
+                removedKeys?.Add(keys[i]);
+
+                keys.RemoveAt(i);
+
+                if (i < values.Count)
+                {
+                    values.RemoveAt(i);
+                }
+
+                removed = true;
+            }
+
+            return removed;
+        }
+
+        #endregion
     }
 
     public class KSettingsData : ScriptableObject
     {
-        #region Fields
+        #region Field
 
-        // bools
         public List<string> boolKeys = new();
         public List<bool> bools = new();
 
-        // ints
         public List<string> intKeys = new();
         public List<int> ints = new();
 
-        // floats
         public List<string> floatKeys = new();
         public List<float> floats = new();
 

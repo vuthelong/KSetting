@@ -7,11 +7,11 @@ namespace Kingfisher.KSetting
 {
     public static class KData
     {
-        #region Fields
+        #region Field
 
         private const string FolderName = ".KData";
-
         private const string GitIgnoreFileName = ".gitignore";
+        private const char PathSeparator = '/';
 
         private const string GitIgnoreContents = "# Kingfisher Tools editor data - local to this machine.\n" +
                                                  "# Delete this file to commit the folder instead.\n" +
@@ -21,7 +21,7 @@ namespace Kingfisher.KSetting
 
         #endregion
 
-        #region Properties
+        #region Property
 
         public static string FolderPath => _folderPath ??= Application.dataPath.GetParentPath().CombinePath(FolderName);
 
@@ -29,9 +29,7 @@ namespace Kingfisher.KSetting
 
         #endregion
 
-        #region Public Methods
-
-        public static string GetFilePath(string fileName) => FolderPath.CombinePath(fileName);
+        #region Asset Storage
 
         public static bool Exists(string fileName) => File.Exists(GetFilePath(fileName));
 
@@ -44,8 +42,11 @@ namespace Kingfisher.KSetting
             var loaded = InternalEditorUtility.LoadSerializedFileAndForget(filePath);
 
             for (var i = 0; i < loaded.Length; i++)
-                if (loaded[i] is T typed)
-                    return typed;
+            {
+                if (loaded[i] is not T typed) continue;
+
+                return typed;
+            }
 
             return null;
         }
@@ -72,7 +73,9 @@ namespace Kingfisher.KSetting
 
         #endregion
 
-        #region Private Methods
+        #region Folder Path
+
+        public static string GetFilePath(string fileName) => FolderPath.CombinePath(fileName);
 
         private static void EnsureFolder()
         {
@@ -85,9 +88,9 @@ namespace Kingfisher.KSetting
             File.WriteAllText(gitIgnorePath, GitIgnoreContents);
         }
 
-        private static string GetParentPath(this string path) => path.LastIndexOf('/') is var i && i > 0 ? path.Substring(0, i) : path;
+        private static string GetParentPath(this string path) => path.LastIndexOf(PathSeparator) is var i && i > 0 ? path.Substring(0, i) : path;
 
-        private static string CombinePath(this string path, string name) => path + "/" + name;
+        private static string CombinePath(this string path, string name) => path + PathSeparator + name;
 
         #endregion
     }
