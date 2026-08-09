@@ -15,7 +15,7 @@ namespace Kingfisher.KSetting
 
         private const string MenuTypeNameFormat = "Kingfisher.{0}.{0}Menu, Kingfisher.{0}";
 
-        public static readonly string[] ToolNames = { "KFolders", "KHierarchy", "KInspector", "KFavorites", "KTabs" };
+        public static readonly string[] ToolNames = { "KFolders", "KHierarchy", "KInspector", "KFavorites", "KTabs", "KEmoji" };
 
         private static List<KTool> _installed;
 
@@ -57,11 +57,16 @@ namespace Kingfisher.KSetting
         private const string DisabledPropertyName = "PluginDisabled";
         private const string LayoutFieldName = "SettingsLayout";
         private const string DeleteDataMethodName = "DeleteData";
+        private const string OpenToolMethodName = "OpenTool";
+        private const string DataPathPropertyName = "DataPath";
         private const string OtherSectionTitle = "Other";
         private const string SettingKeySeparator = "-";
         private const string LegacyKeyPrefix = "v";
         private const string CurrentKeyInfix = "-kingfisher-";
         private const string LegacyKeyInfix = "-vtools-";
+
+        private const char PathSeparator = '/';
+        private const char WindowsPathSeparator = '\\';
 
         private const char SectionMarker = '#';
         private const char SliderMarker = '~';
@@ -77,6 +82,8 @@ namespace Kingfisher.KSetting
         private const int SliderMaxIndex = 3;
 
         private readonly MethodInfo _deleteDataMethod;
+        private readonly MethodInfo _openToolMethod;
+        private readonly PropertyInfo _dataPathProperty;
 
         #endregion
 
@@ -91,6 +98,14 @@ namespace Kingfisher.KSetting
         // K-Tabs keeps nothing of its own in .KData, so it gets no delete button.
         public bool CanDeleteData => this._deleteDataMethod != null;
 
+        // Only the tools with a window of their own get an open button.
+        public bool CanOpenTool => this._openToolMethod != null;
+
+        // Tools whose data is project content keep it in the project instead of .KData.
+        public string DataPath => this._dataPathProperty?.GetValue(null) as string;
+
+        public string DataFolder => DataPath is { } path ? Path.GetDirectoryName(path)?.Replace(WindowsPathSeparator, PathSeparator) : KData.RelativeFolderPath;
+
         #endregion
 
         #region Section Building
@@ -100,6 +115,8 @@ namespace Kingfisher.KSetting
             Name = name;
 
             this._deleteDataMethod = menuType.GetMethod(DeleteDataMethodName, BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
+            this._openToolMethod = menuType.GetMethod(OpenToolMethodName, BindingFlags.Public | BindingFlags.Static, null, Type.EmptyTypes, null);
+            this._dataPathProperty = menuType.GetProperty(DataPathPropertyName, BindingFlags.Public | BindingFlags.Static);
 
             var propertiesByName = new Dictionary<string, PropertyInfo>();
             var declarationOrder = new List<string>();
@@ -269,6 +286,14 @@ namespace Kingfisher.KSetting
         {
             results.Clear();
 
+            if (DataPath is { } dataPath)
+            {
+                if (File.Exists(dataPath))
+                    results.Add(Path.GetFileName(dataPath));
+
+                return;
+            }
+
             if (!Directory.Exists(KData.FolderPath)) return;
 
             var filePaths = Directory.GetFiles(KData.FolderPath);
@@ -310,6 +335,12 @@ namespace Kingfisher.KSetting
             EditorPrefs.DeleteKey(previous);
             EditorPrefs.DeleteKey(LegacyKeyPrefix + previous.Replace(CurrentKeyInfix, LegacyKeyInfix));
         }
+
+        #endregion
+
+        #region Method
+
+        public void OpenTool() => this._openToolMethod?.Invoke(null, null);
 
         #endregion
     }
