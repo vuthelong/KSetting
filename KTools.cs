@@ -6,6 +6,7 @@ using System.IO;
 using System.Reflection;
 using System.Text;
 using UnityEditor;
+using UnityEngine;
 
 namespace Kingfisher.KSetting
 {
@@ -71,7 +72,12 @@ namespace Kingfisher.KSetting
         private const char SectionMarker = '#';
         private const char SliderMarker = '~';
         private const char ChoiceMarker = '*';
+        private const char ColorMarker = '&';
         private const char LabelSeparator = '|';
+
+        private const int ColorNameIndex = 0;
+        private const int ColorLabelIndex = 1;
+        private const int ColorPartCount = 2;
 
         private const int MarkerLength = 1;
         private const int LegacyKeyOffset = 1;
@@ -127,7 +133,7 @@ namespace Kingfisher.KSetting
 
                 var isBool = property.PropertyType == typeof(bool);
 
-                if (!isBool && property.PropertyType != typeof(float)) continue;
+                if (!isBool && property.PropertyType != typeof(float) && property.PropertyType != typeof(Color)) continue;
 
                 if (isBool && property.Name == DisabledPropertyName)
                 {
@@ -192,6 +198,15 @@ namespace Kingfisher.KSetting
                     continue;
                 }
 
+                if (line[0] == ColorMarker)
+                {
+                    AddColor(section, line.Substring(MarkerLength), propertiesByName, placed);
+
+                    choice = null;
+
+                    continue;
+                }
+
                 var isChoice = line[0] == ChoiceMarker;
                 var body = isChoice ? line.Substring(MarkerLength).Trim() : line.Trim();
 
@@ -204,6 +219,7 @@ namespace Kingfisher.KSetting
                 }
 
                 if (!propertiesByName.TryGetValue(body, out var property)) continue;
+                if (property.PropertyType != typeof(bool)) continue;
 
                 placed.Add(body);
 
@@ -260,6 +276,21 @@ namespace Kingfisher.KSetting
             placed.Add(propertyName);
 
             section.Entries.Add(new KToolEntry(new KToolSetting(property, parts[SliderLabelIndex].Trim(), min, max)));
+        }
+
+        private static void AddColor(KToolSection section, string body, Dictionary<string, PropertyInfo> propertiesByName, HashSet<string> placed)
+        {
+            var parts = body.Split(LabelSeparator);
+
+            var propertyName = parts[ColorNameIndex].Trim();
+            var label = parts.Length >= ColorPartCount ? parts[ColorLabelIndex].Trim() : null;
+
+            if (!propertiesByName.TryGetValue(propertyName, out var property)) return;
+            if (property.PropertyType != typeof(Color)) return;
+
+            placed.Add(propertyName);
+
+            section.Entries.Add(new KToolEntry(new KToolSetting(property, label, isColor: true)));
         }
 
         private void AddSection(string title, List<string> propertyNames, Dictionary<string, PropertyInfo> propertiesByName)
@@ -403,9 +434,17 @@ namespace Kingfisher.KSetting
 
         public bool IsSlider { get; }
 
+        public bool IsColor { get; }
+
         public float Min { get; }
 
         public float Max { get; }
+
+        public Color ColorValue
+        {
+            get => (Color)this._property.GetValue(null);
+            set => this._property.SetValue(null, value);
+        }
 
         public bool Value
         {
@@ -428,6 +467,14 @@ namespace Kingfisher.KSetting
             this._property = property;
 
             Label = label ?? Prettify(property.Name);
+        }
+
+        public KToolSetting(PropertyInfo property, string label, bool isColor)
+        {
+            this._property = property;
+
+            Label = label ?? Prettify(property.Name);
+            IsColor = isColor;
         }
 
         public KToolSetting(PropertyInfo property, string label, float min, float max)

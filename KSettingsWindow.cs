@@ -428,6 +428,13 @@ namespace Kingfisher.KSetting
                 return;
             }
 
+            if (setting.IsColor)
+            {
+                DrawColorRow(setting);
+
+                return;
+            }
+
             DrawToggleRow(setting);
         }
 
@@ -452,6 +459,29 @@ namespace Kingfisher.KSetting
             if (newValue == setting.Value) return;
 
             Apply(setting, newValue);
+        }
+
+        private static void DrawColorRow(KToolSetting setting)
+        {
+            var rect = GetRowRect();
+            var value = setting.ColorValue;
+            var previousLabelWidth = EditorGUIUtility.labelWidth;
+
+            EditorGUIUtility.labelWidth = SliderLabelWidth;
+
+            BeginLabelTint();
+
+            var newValue = EditorGUI.ColorField(rect, setting.Label, value);
+
+            EndLabelTint();
+
+            EditorGUIUtility.labelWidth = previousLabelWidth;
+
+            if (newValue == value) return;
+
+            setting.ColorValue = newValue;
+
+            InternalEditorUtility.RepaintAllViews();
         }
 
         private static void DrawSliderRow(KToolSetting setting)
