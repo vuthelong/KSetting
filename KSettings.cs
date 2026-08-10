@@ -11,6 +11,8 @@ namespace Kingfisher.KSetting
 
         public const string FileName = "KSettings.asset";
 
+        private const int NotFoundIndex = -1;
+
         private static KSettingsData _data;
 
         #endregion
@@ -33,7 +35,7 @@ namespace Kingfisher.KSetting
 
         public static int GetInt(string key, int defaultValue = 0) => Get(Data.intKeys, Data.ints, key, defaultValue);
 
-        public static float GetFloat(string key, float defaultValue = 0) => Get(Data.floatKeys, Data.floats, key, defaultValue);
+        public static float GetFloat(string key, float defaultValue = 0f) => Get(Data.floatKeys, Data.floats, key, defaultValue);
 
         public static void SetBool(string key, bool value) => Set(Data.boolKeys, Data.bools, key, value);
 
@@ -43,16 +45,16 @@ namespace Kingfisher.KSetting
 
         private static T Get<T>(List<string> keys, List<T> values, string key, T defaultValue)
         {
-            var i = keys.IndexOf(key);
+            var index = keys.IndexOf(key);
 
-            return i != -1 && i < values.Count ? values[i] : defaultValue;
+            return index != NotFoundIndex && index < values.Count ? values[index] : defaultValue;
         }
 
         private static void Set<T>(List<string> keys, List<T> values, string key, T value)
         {
-            var i = keys.IndexOf(key);
+            var index = keys.IndexOf(key);
 
-            if (i == -1 || i >= values.Count)
+            if (index == NotFoundIndex || index >= values.Count)
             {
                 keys.Add(key);
                 values.Add(value);
@@ -62,9 +64,9 @@ namespace Kingfisher.KSetting
                 return;
             }
 
-            if (EqualityComparer<T>.Default.Equals(values[i], value)) return;
+            if (EqualityComparer<T>.Default.Equals(values[index], value)) return;
 
-            values[i] = value;
+            values[index] = value;
 
             Save();
         }

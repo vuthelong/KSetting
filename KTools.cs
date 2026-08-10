@@ -80,7 +80,9 @@ namespace Kingfisher.KSetting
         private const int ColorPartCount = 2;
 
         private const int MarkerLength = 1;
+        private const int SeparatorLength = 1;
         private const int LegacyKeyOffset = 1;
+        private const int NotFoundIndex = -1;
         private const int SliderPartCount = 4;
         private const int SliderNameIndex = 0;
         private const int SliderLabelIndex = 1;
@@ -101,13 +103,10 @@ namespace Kingfisher.KSetting
 
         public KToolSetting DisabledSetting { get; }
 
-        // K-Tabs keeps nothing of its own in .KData, so it gets no delete button.
         public bool CanDeleteData => this._deleteDataMethod != null;
 
-        // Only the tools with a window of their own get an open button.
         public bool CanOpenTool => this._openToolMethod != null;
 
-        // Tools whose data is project content keep it in the project instead of .KData.
         public string DataPath => this._dataPathProperty?.GetValue(null) as string;
 
         public string DataFolder => DataPath is { } path ? Path.GetDirectoryName(path)?.Replace(WindowsPathSeparator, PathSeparator) : KData.RelativeFolderPath;
@@ -144,7 +143,6 @@ namespace Kingfisher.KSetting
 
                 propertiesByName[property.Name] = property;
 
-                // Sliders are only drawn where the layout asks for one, so they stay out of the leftover "Other" section.
                 if (isBool)
                 {
                     declarationOrder.Add(property.Name);
@@ -166,6 +164,13 @@ namespace Kingfisher.KSetting
             }
 
             var placed = new HashSet<string>();
+
+            ParseLayout(layout, propertiesByName, placed);
+            AddSection(OtherSectionTitle, GetLeftovers(declarationOrder, placed), propertiesByName);
+        }
+
+        private void ParseLayout(string[] layout, Dictionary<string, PropertyInfo> propertiesByName, HashSet<string> placed)
+        {
             var section = new KToolSection(null);
 
             KToolEntry choice = null;
@@ -178,10 +183,7 @@ namespace Kingfisher.KSetting
 
                 if (line[0] == SectionMarker)
                 {
-                    if (section.Entries.Count != 0)
-                    {
-                        Sections.Add(section);
-                    }
+                    AddFilledSection(section);
 
                     section = new KToolSection(line.Substring(MarkerLength).Trim());
                     choice = null;
@@ -208,17 +210,10 @@ namespace Kingfisher.KSetting
                 }
 
                 var isChoice = line[0] == ChoiceMarker;
-                var body = isChoice ? line.Substring(MarkerLength).Trim() : line.Trim();
-
-                string label = null;
-
-                if (body.IndexOf(LabelSeparator) is var pipe && pipe != -1)
-                {
-                    label = body.Substring(pipe + 1).Trim();
-                    body = body.Substring(0, pipe).Trim();
-                }
+                var body = SplitLabel(isChoice ? line.Substring(MarkerLength).Trim() : line.Trim(), out var label);
 
                 if (!propertiesByName.TryGetValue(body, out var property)) continue;
+
                 if (property.PropertyType != typeof(bool)) continue;
 
                 placed.Add(body);
@@ -235,17 +230,35 @@ namespace Kingfisher.KSetting
 
                 if (choice == null)
                 {
-                    section.Entries.Add(choice = new KToolEntry());
+                    choice = new KToolEntry();
+
+                    section.Entries.Add(choice);
                 }
 
                 choice.Settings.Add(setting);
             }
 
-            if (section.Entries.Count != 0)
+            AddFilledSection(section);
+        }
+
+        private static string SplitLabel(string body, out string label)
+        {
+            var separator = body.IndexOf(LabelSeparator);
+
+            if (separator == NotFoundIndex)
             {
-                Sections.Add(section);
+                label = null;
+
+                return body;
             }
 
+            label = body.Substring(separator + SeparatorLength).Trim();
+
+            return body.Substring(0, separator).Trim();
+        }
+
+        private static List<string> GetLeftovers(List<string> declarationOrder, HashSet<string> placed)
+        {
             var leftovers = new List<string>();
 
             for (var i = 0; i < declarationOrder.Count; i++)
@@ -255,10 +268,9 @@ namespace Kingfisher.KSetting
                 leftovers.Add(declarationOrder[i]);
             }
 
-            AddSection(OtherSectionTitle, leftovers, propertiesByName);
+            return leftovers;
         }
 
-        // Slider layout line: "~PropertyName|Label|min|max".
         private static void AddSlider(KToolSection section, string body, Dictionary<string, PropertyInfo> propertiesByName, HashSet<string> placed)
         {
             var parts = body.Split(LabelSeparator);
@@ -286,6 +298,7 @@ namespace Kingfisher.KSetting
             var label = parts.Length >= ColorPartCount ? parts[ColorLabelIndex].Trim() : null;
 
             if (!propertiesByName.TryGetValue(propertyName, out var property)) return;
+
             if (property.PropertyType != typeof(Color)) return;
 
             placed.Add(propertyName);
@@ -307,6 +320,13 @@ namespace Kingfisher.KSetting
             Sections.Add(section);
         }
 
+        private void AddFilledSection(KToolSection section)
+        {
+            if (section.Entries.Count == 0) return;
+
+            Sections.Add(section);
+        }
+
         #endregion
 
         #region Stored Data
@@ -320,7 +340,9 @@ namespace Kingfisher.KSetting
             if (DataPath is { } dataPath)
             {
                 if (File.Exists(dataPath))
+                {
                     results.Add(Path.GetFileName(dataPath));
+                }
 
                 return;
             }
@@ -343,7 +365,6 @@ namespace Kingfisher.KSetting
 
         #region Setting Reset
 
-        // Deleting the keys rather than writing false back: the tools pick their own defaults when a key is missing, and not every default is false.
         public void ResetSettings()
         {
             var removedKeys = new List<string>();
@@ -360,7 +381,6 @@ namespace Kingfisher.KSetting
         {
             EditorPrefs.DeleteKey(key);
 
-            // The tools fall back to these pre-rename keys whenever the current one is missing, so leaving them behind would restore the old value.
             var previous = key.Substring(LegacyKeyOffset);
 
             EditorPrefs.DeleteKey(previous);
@@ -423,6 +443,8 @@ namespace Kingfisher.KSetting
         #region Field
 
         private const string EnabledSuffix = "Enabled";
+
+        private const char WordSeparator = ' ';
 
         private readonly PropertyInfo _property;
 
@@ -509,7 +531,7 @@ namespace Kingfisher.KSetting
 
                 if (char.IsUpper(character) && !char.IsUpper(propertyName[i - 1]))
                 {
-                    builder.Append(' ').Append(char.ToLowerInvariant(character));
+                    builder.Append(WordSeparator).Append(char.ToLowerInvariant(character));
                 }
                 else
                 {

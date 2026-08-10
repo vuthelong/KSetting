@@ -454,11 +454,11 @@ namespace Kingfisher.KSetting
 
         private static void DrawToggleRow(KToolSetting setting)
         {
-            var newValue = DrawCheckbox(GetRowRect(), setting.Value, setting.Label);
+            var newIsOn = DrawCheckbox(GetRowRect(), setting.Value, setting.Label);
 
-            if (newValue == setting.Value) return;
+            if (newIsOn == setting.Value) return;
 
-            Apply(setting, newValue);
+            Apply(setting, newIsOn);
         }
 
         private static void DrawColorRow(KToolSetting setting)
@@ -564,7 +564,6 @@ namespace Kingfisher.KSetting
 
             if (GUI.Button(openRect, OpenButtonContent, _buttonStyle))
             {
-                // Off the GUI stack - a window cannot be opened from inside another window's OnGUI.
                 EditorApplication.delayCall += this._selectedTool.OpenTool;
             }
 
@@ -603,34 +602,34 @@ namespace Kingfisher.KSetting
 
         #region Setting Control
 
-        private static bool DrawCheckbox(Rect rect, bool value, string label)
+        private static bool DrawCheckbox(Rect rect, bool isOn, string label)
         {
-            var newValue = GUI.Toggle(rect, value, label, _settingLabelStyle);
+            var newIsOn = GUI.Toggle(rect, isOn, label, _settingLabelStyle);
             var boxRect = GetBoxRect(rect);
 
-            DrawBox(boxRect, value, BoxRadius);
+            DrawBox(boxRect, isOn, BoxRadius);
 
-            if (!value) return newValue;
+            if (!isOn) return newIsOn;
 
             DrawTick(boxRect);
 
-            return newValue;
+            return newIsOn;
         }
 
-        private static bool DrawRadio(Rect rect, bool value, string label)
+        private static bool DrawRadio(Rect rect, bool isOn, string label)
         {
-            var newValue = GUI.Toggle(rect, value, label, _settingLabelStyle);
+            var newIsOn = GUI.Toggle(rect, isOn, label, _settingLabelStyle);
             var boxRect = GetBoxRect(rect);
 
-            DrawBox(boxRect, value, BoxSize * .5f);
+            DrawBox(boxRect, isOn, BoxSize * .5f);
 
-            if (!value) return newValue;
+            if (!isOn) return newIsOn;
 
             var dotRect = new Rect(boxRect.center.x - DotSize * .5f, boxRect.center.y - DotSize * .5f, DotSize, DotSize);
 
             DrawRounded(dotRect, Dim(Color.white), 0f, DotSize * .5f);
 
-            return newValue;
+            return newIsOn;
         }
 
         private static void DrawBox(Rect rect, bool isOn, float radius)
@@ -829,7 +828,6 @@ namespace Kingfisher.KSetting
 
             if (!EditorUtility.DisplayDialog(string.Format(DeleteDataTitleFormat, tool.Name), body, DeleteConfirmLabel, CancelLabel)) return;
 
-            // Off the GUI stack - the dialog already interrupted this OnGUI pass.
             EditorApplication.delayCall += () =>
             {
                 tool.DeleteData();
@@ -850,7 +848,6 @@ namespace Kingfisher.KSetting
             {
                 tool.ResetSettings();
 
-                // The tools cache settings in statics that only a reload clears.
                 EditorUtility.RequestScriptReload();
             };
         }
@@ -915,7 +912,7 @@ namespace Kingfisher.KSetting
 
         private static Color GetSkinTextColor(float alpha) => GetGreyscale(IsDark ? 1f : 0f, alpha);
 
-        private static Color GetGreyscale(float value, float alpha = 1) => new(value, value, value, alpha);
+        private static Color GetGreyscale(float value, float alpha = 1f) => new(value, value, value, alpha);
 
         #endregion
 
@@ -933,9 +930,9 @@ namespace Kingfisher.KSetting
             window.RebuildFilter();
         }
 
-        private static void Apply(KToolSetting setting, bool value)
+        private static void Apply(KToolSetting setting, bool isOn)
         {
-            setting.Value = value;
+            setting.Value = isOn;
 
             InternalEditorUtility.RepaintAllViews();
         }

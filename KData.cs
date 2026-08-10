@@ -57,7 +57,7 @@ namespace Kingfisher.KSetting
 
             var created = ScriptableObject.CreateInstance<T>();
 
-            created.hideFlags = HideFlags.HideAndDontSave;
+            created.hideFlags = HideFlags.HideInHierarchy | HideFlags.DontSave;
 
             return created;
         }
@@ -88,7 +88,7 @@ namespace Kingfisher.KSetting
             File.WriteAllText(gitIgnorePath, GitIgnoreContents);
         }
 
-        private static string GetParentPath(this string path) => path.LastIndexOf(PathSeparator) is var i && i > 0 ? path.Substring(0, i) : path;
+        private static string GetParentPath(this string path) => path.LastIndexOf(PathSeparator) is var separatorIndex && separatorIndex > 0 ? path.Substring(0, separatorIndex) : path;
 
         private static string CombinePath(this string path, string name) => path + PathSeparator + name;
 
