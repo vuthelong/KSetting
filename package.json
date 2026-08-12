@@ -14,5 +14,6 @@
     "tools",
     "workflow"
   ],
+  "changelogUrl": "https://github.com/vuthelong/KSetting/blob/main/CHANGELOG.md",
   "hideInEditor": false
 }
