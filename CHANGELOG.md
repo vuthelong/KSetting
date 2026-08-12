@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-08-10
+## [1.0.0] - 2026-08-13
 
 ### Added
 
-- First public release.
+- **Tools > KTools Setting**, one window that every installed Kingfisher tool
+  folds its settings into.
+- Tools are discovered by reflection at load time, so there is nothing to wire
+  up and no tool has to reference K-Setting. Add a tool, and its section
+  appears in the window.
+- Each tool describes its own section - headings, toggles, radio groups,
+  sliders and color fields - so the window needs no per-tool code here.
+- Per-tool controls to open the tool, disable it, reset its settings and delete
+  its stored data, listing the files that would be removed.
+- Shared settings store alongside the tools' own data in a `.KData` folder
+  beside `Assets`, which gitignores itself on creation.
+- Installs as a UPM package from its git URL, or as a plain folder under
+  `Assets/`.
+- Editor-only: the assembly is `Editor`-platform only, so nothing is compiled
+  into player builds.
