@@ -14,6 +14,8 @@
     "tools",
     "workflow"
   ],
+  "documentationUrl": "https://github.com/vuthelong/KSetting/blob/main/README.md",
   "changelogUrl": "https://github.com/vuthelong/KSetting/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/vuthelong/KSetting/blob/main/LICENSE.md",
   "hideInEditor": false
 }
