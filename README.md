@@ -37,8 +37,13 @@ git submodule add https://github.com/vuthelong/KSetting.git Assets/ThirdParty/Ki
 Check out a tag to pin a version:
 
 ```
-git -C Assets/ThirdParty/KingfisherTools/KSetting checkout 1.0.1
+git -C Assets/ThirdParty/KingfisherTools/KSetting checkout 1.0.2
 ```
+
+Alternatively, download the `.unitypackage` from the
+[latest release](https://github.com/vuthelong/KSetting/releases/latest) and
+import it via **Assets > Import Package > Custom Package**. This is a
+point-in-time snapshot, not a tracked install - re-download it to update.
 
 Keep one copy of the folder per project - Unity rejects a second with
 `Assembly with name 'Kingfisher.KSetting' already exists`.
