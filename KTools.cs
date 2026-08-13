@@ -446,7 +446,12 @@ namespace Kingfisher.KSetting
 
         private const char WordSeparator = ' ';
 
-        private readonly PropertyInfo _property;
+        private Func<bool> _getValue;
+        private Action<bool> _setValue;
+        private Func<float> _getSliderValue;
+        private Action<float> _setSliderValue;
+        private Func<Color> _getColorValue;
+        private Action<Color> _setColorValue;
 
         #endregion
 
@@ -464,20 +469,20 @@ namespace Kingfisher.KSetting
 
         public Color ColorValue
         {
-            get => (Color)this._property.GetValue(null);
-            set => this._property.SetValue(null, value);
+            get => this._getColorValue();
+            set => this._setColorValue(value);
         }
 
         public bool Value
         {
-            get => (bool)this._property.GetValue(null);
-            set => this._property.SetValue(null, value);
+            get => this._getValue();
+            set => this._setValue(value);
         }
 
         public float SliderValue
         {
-            get => (float)this._property.GetValue(null);
-            set => this._property.SetValue(null, value);
+            get => this._getSliderValue();
+            set => this._setSliderValue(value);
         }
 
         #endregion
@@ -486,27 +491,49 @@ namespace Kingfisher.KSetting
 
         public KToolSetting(PropertyInfo property, string label = null)
         {
-            this._property = property;
-
             Label = label ?? Prettify(property.Name);
+
+            BindProperty(property);
         }
 
         public KToolSetting(PropertyInfo property, string label, bool isColor)
         {
-            this._property = property;
-
             Label = label ?? Prettify(property.Name);
             IsColor = isColor;
+
+            BindProperty(property);
         }
 
         public KToolSetting(PropertyInfo property, string label, float min, float max)
         {
-            this._property = property;
-
             Label = label ?? Prettify(property.Name);
             IsSlider = true;
             Min = min;
             Max = max;
+
+            BindProperty(property);
+        }
+
+        private void BindProperty(PropertyInfo property)
+        {
+            if (property.PropertyType == typeof(bool))
+            {
+                this._getValue = (Func<bool>)Delegate.CreateDelegate(typeof(Func<bool>), property.GetGetMethod());
+                this._setValue = (Action<bool>)Delegate.CreateDelegate(typeof(Action<bool>), property.GetSetMethod());
+
+                return;
+            }
+
+            if (property.PropertyType == typeof(float))
+            {
+                this._getSliderValue = (Func<float>)Delegate.CreateDelegate(typeof(Func<float>), property.GetGetMethod());
+                this._setSliderValue = (Action<float>)Delegate.CreateDelegate(typeof(Action<float>), property.GetSetMethod());
+
+                return;
+            }
+
+            this._getColorValue = (Func<Color>)Delegate.CreateDelegate(typeof(Func<Color>), property.GetGetMethod());
+            this._setColorValue = (Action<Color>)Delegate.CreateDelegate(typeof(Action<Color>), property.GetSetMethod());
         }
 
         private static string Prettify(string propertyName)

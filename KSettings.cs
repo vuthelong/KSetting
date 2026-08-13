@@ -11,9 +11,12 @@ namespace Kingfisher.KSetting
 
         public const string FileName = "KSettings.asset";
 
-        private const int NotFoundIndex = -1;
+        private static readonly List<string> RemovalKeys = new();
 
         private static KSettingsData _data;
+
+        private static int _deferDepth;
+        private static bool _isDirty;
 
         #endregion
 
@@ -25,50 +28,42 @@ namespace Kingfisher.KSetting
 
         #region Setting Access
 
-        public static bool HasBool(string key) => Data.boolKeys.Contains(key);
+        public static bool HasBool(string key) => Data.bools.ContainsKey(key);
 
-        public static bool HasInt(string key) => Data.intKeys.Contains(key);
+        public static bool HasInt(string key) => Data.ints.ContainsKey(key);
 
-        public static bool HasFloat(string key) => Data.floatKeys.Contains(key);
+        public static bool HasFloat(string key) => Data.floats.ContainsKey(key);
 
-        public static bool GetBool(string key, bool defaultValue = false) => Get(Data.boolKeys, Data.bools, key, defaultValue);
+        public static bool GetBool(string key, bool defaultValue = false) => Get(Data.bools, key, defaultValue);
 
-        public static int GetInt(string key, int defaultValue = 0) => Get(Data.intKeys, Data.ints, key, defaultValue);
+        public static int GetInt(string key, int defaultValue = 0) => Get(Data.ints, key, defaultValue);
 
-        public static float GetFloat(string key, float defaultValue = 0f) => Get(Data.floatKeys, Data.floats, key, defaultValue);
+        public static float GetFloat(string key, float defaultValue = 0f) => Get(Data.floats, key, defaultValue);
 
-        public static void SetBool(string key, bool value) => Set(Data.boolKeys, Data.bools, key, value);
+        public static void SetBool(string key, bool value) => Set(Data.bools, key, value);
 
-        public static void SetInt(string key, int value) => Set(Data.intKeys, Data.ints, key, value);
+        public static void SetInt(string key, int value) => Set(Data.ints, key, value);
 
-        public static void SetFloat(string key, float value) => Set(Data.floatKeys, Data.floats, key, value);
+        public static void SetFloat(string key, float value) => Set(Data.floats, key, value);
 
-        private static T Get<T>(List<string> keys, List<T> values, string key, T defaultValue)
+        private static T Get<T>(SerializableDictionary<string, T> values, string key, T defaultValue) => values.TryGetValue(key, out var value) ? value : defaultValue;
+
+        private static void Set<T>(SerializableDictionary<string, T> values, string key, T value)
         {
-            var index = keys.IndexOf(key);
-
-            return index != NotFoundIndex && index < values.Count ? values[index] : defaultValue;
-        }
-
-        private static void Set<T>(List<string> keys, List<T> values, string key, T value)
-        {
-            var index = keys.IndexOf(key);
-
-            if (index == NotFoundIndex || index >= values.Count)
+            if (values.TryGetValue(key, out var existing))
             {
-                keys.Add(key);
-                values.Add(value);
+                if (EqualityComparer<T>.Default.Equals(existing, value)) return;
 
-                Save();
+                values[key] = value;
+
+                RequestSave();
 
                 return;
             }
 
-            if (EqualityComparer<T>.Default.Equals(values[index], value)) return;
+            values.Add(key, value);
 
-            values[index] = value;
-
-            Save();
+            RequestSave();
         }
 
         #endregion
@@ -77,34 +72,64 @@ namespace Kingfisher.KSetting
 
         public static void Save() => KData.Save(Data, FileName);
 
+        public static void BeginDeferredSave() => _deferDepth++;
+
+        public static void EndDeferredSave()
+        {
+            if (_deferDepth > 0)
+            {
+                _deferDepth--;
+            }
+
+            if (_deferDepth > 0 || !_isDirty) return;
+
+            _isDirty = false;
+
+            Save();
+        }
+
+        private static void RequestSave()
+        {
+            if (_deferDepth > 0)
+            {
+                _isDirty = true;
+
+                return;
+            }
+
+            Save();
+        }
+
         public static void RemoveByPrefix(string prefix, List<string> removedKeys)
         {
-            var removed = Remove(Data.boolKeys, Data.bools, prefix, removedKeys);
+            var removed = Remove(Data.bools, prefix, removedKeys);
 
-            removed |= Remove(Data.intKeys, Data.ints, prefix, removedKeys);
-            removed |= Remove(Data.floatKeys, Data.floats, prefix, removedKeys);
+            removed |= Remove(Data.ints, prefix, removedKeys);
+            removed |= Remove(Data.floats, prefix, removedKeys);
 
             if (!removed) return;
 
             Save();
         }
 
-        private static bool Remove<T>(List<string> keys, List<T> values, string prefix, List<string> removedKeys)
+        private static bool Remove<T>(SerializableDictionary<string, T> values, string prefix, List<string> removedKeys)
         {
             var removed = false;
 
-            for (var i = keys.Count - 1; i >= 0; i--)
+            RemovalKeys.Clear();
+
+            foreach (var key in values.Keys)
             {
-                if (!keys[i].StartsWith(prefix, StringComparison.Ordinal)) continue;
+                if (!key.StartsWith(prefix, StringComparison.Ordinal)) continue;
 
-                removedKeys?.Add(keys[i]);
+                RemovalKeys.Add(key);
+            }
 
-                keys.RemoveAt(i);
+            for (var i = 0; i < RemovalKeys.Count; i++)
+            {
+                removedKeys?.Add(RemovalKeys[i]);
 
-                if (i < values.Count)
-                {
-                    values.RemoveAt(i);
-                }
+                values.Remove(RemovalKeys[i]);
 
                 removed = true;
             }
@@ -119,14 +144,59 @@ namespace Kingfisher.KSetting
     {
         #region Field
 
-        public List<string> boolKeys = new();
-        public List<bool> bools = new();
+        public SerializableDictionary<string, bool> bools = new();
 
-        public List<string> intKeys = new();
-        public List<int> ints = new();
+        public SerializableDictionary<string, int> ints = new();
 
-        public List<string> floatKeys = new();
-        public List<float> floats = new();
+        public SerializableDictionary<string, float> floats = new();
+
+        #endregion
+    }
+
+    [Serializable]
+    public class SerializableDictionary<TKey, TValue> : Dictionary<TKey, TValue>, ISerializationCallbackReceiver
+    {
+        #region Field
+
+        [SerializeField] private List<TKey> keys = new();
+
+        [SerializeField] private List<TValue> values = new();
+
+        #endregion
+
+        #region Method
+
+        public void OnBeforeSerialize()
+        {
+            this.keys.Clear();
+            this.values.Clear();
+
+            if (this.keys.Capacity < Count)
+            {
+                this.keys.Capacity = Count;
+            }
+
+            if (this.values.Capacity < Count)
+            {
+                this.values.Capacity = Count;
+            }
+
+            foreach (var pair in this)
+            {
+                this.keys.Add(pair.Key);
+                this.values.Add(pair.Value);
+            }
+        }
+
+        public void OnAfterDeserialize()
+        {
+            Clear();
+
+            for (var i = 0; i < this.keys.Count; i++)
+            {
+                this[this.keys[i]] = this.values[i];
+            }
+        }
 
         #endregion
     }

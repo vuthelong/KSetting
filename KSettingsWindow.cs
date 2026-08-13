@@ -81,6 +81,8 @@ namespace Kingfisher.KSetting
         private const float FooterTextAlpha = .45f;
         private const float EmptyTextAlpha = .5f;
 
+        private const double LiveRepaintIntervalSeconds = .05;
+
         private static readonly float RowHeight = EditorGUIUtility.singleLineHeight + RowSpacing;
         private static readonly float RowInset = RowSpacing * .5f;
 
@@ -120,7 +122,7 @@ namespace Kingfisher.KSetting
         private static readonly GUIContent EmptyStateContent = new("No K tools found in this project.");
 
         private static readonly GUILayoutOption[] ExpandWidthOptions = { GUILayout.ExpandWidth(true) };
-        private static readonly Dictionary<string, GUIContent> SectionTitleContents = new();
+        private static readonly Dictionary<string, (GUIContent Content, float Width, int StylesVersion)> SectionTitleContents = new();
         private static readonly List<string> StoredDataFiles = new();
 
         private static Color _previousContentColor;
@@ -138,6 +140,9 @@ namespace Kingfisher.KSetting
         private static float _breadcrumbRootWidth;
         private static bool _hasBuiltStyles;
         private static bool _isStyleDark;
+        private static int _stylesVersion;
+        private static double _nextRepaintAllViewsTime;
+        private static double _nextRepaintTime;
 
         private readonly List<KTool> _visibleTools = new();
         private readonly List<KToolSection> _sections = new();
@@ -157,6 +162,10 @@ namespace Kingfisher.KSetting
         #region Property
 
         private static bool IsDark => EditorGUIUtility.isProSkin;
+
+        private static bool IsDragStart => Event.current.rawType == EventType.MouseDown;
+
+        private static bool IsDragEnd => Event.current.rawType == EventType.MouseUp;
 
         private static Color WindowBackground => IsDark ? DarkWindowColor : LightWindowColor;
 
@@ -221,10 +230,12 @@ namespace Kingfisher.KSetting
 
             if (Event.current.type != EventType.MouseMove) return;
 
-            Repaint();
+            RequestRepaint();
         }
 
         private void OnFocus() => this._hasDataFolder = Directory.Exists(KData.FolderPath);
+
+        private void OnLostFocus() => KSettings.EndDeferredSave();
 
         #endregion
 
@@ -394,8 +405,8 @@ namespace Kingfisher.KSetting
             GUILayout.Space(topSpacing);
 
             var rect = GUILayoutUtility.GetRect(0f, SectionHeaderHeight, ExpandWidthOptions);
-            var content = GetSectionTitleContent(title);
-            var labelRect = new Rect(rect.x + Padding, rect.y, _sectionStyle.CalcSize(content).x, rect.height);
+            var content = GetSectionTitleContent(title, out var width);
+            var labelRect = new Rect(rect.x + Padding, rect.y, width, rect.height);
 
             GUI.Label(labelRect, content, _sectionStyle);
 
@@ -463,6 +474,11 @@ namespace Kingfisher.KSetting
 
         private static void DrawColorRow(KToolSetting setting)
         {
+            if (IsDragStart)
+            {
+                KSettings.BeginDeferredSave();
+            }
+
             var rect = GetRowRect();
             var value = setting.ColorValue;
             var previousLabelWidth = EditorGUIUtility.labelWidth;
@@ -477,15 +493,26 @@ namespace Kingfisher.KSetting
 
             EditorGUIUtility.labelWidth = previousLabelWidth;
 
-            if (newValue == value) return;
+            if (newValue != value)
+            {
+                setting.ColorValue = newValue;
 
-            setting.ColorValue = newValue;
+                RequestLiveRepaint();
+            }
 
-            InternalEditorUtility.RepaintAllViews();
+            if (IsDragEnd)
+            {
+                KSettings.EndDeferredSave();
+            }
         }
 
         private static void DrawSliderRow(KToolSetting setting)
         {
+            if (IsDragStart)
+            {
+                KSettings.BeginDeferredSave();
+            }
+
             var rect = GetRowRect();
             var value = setting.SliderValue;
             var previousLabelWidth = EditorGUIUtility.labelWidth;
@@ -500,11 +527,39 @@ namespace Kingfisher.KSetting
 
             EditorGUIUtility.labelWidth = previousLabelWidth;
 
-            if (Mathf.Approximately(newValue, value)) return;
+            if (!Mathf.Approximately(newValue, value))
+            {
+                setting.SliderValue = newValue;
 
-            setting.SliderValue = newValue;
+                RequestLiveRepaint();
+            }
+
+            if (IsDragEnd)
+            {
+                KSettings.EndDeferredSave();
+            }
+        }
+
+        private static void RequestLiveRepaint()
+        {
+            var now = EditorApplication.timeSinceStartup;
+
+            if (!IsDragEnd && now < _nextRepaintAllViewsTime) return;
+
+            _nextRepaintAllViewsTime = now + LiveRepaintIntervalSeconds;
 
             InternalEditorUtility.RepaintAllViews();
+        }
+
+        private void RequestRepaint()
+        {
+            var now = EditorApplication.timeSinceStartup;
+
+            if (now < _nextRepaintTime) return;
+
+            _nextRepaintTime = now + LiveRepaintIntervalSeconds;
+
+            Repaint();
         }
 
         private static void DrawNotice(GUIContent content) => GUI.Label(GetRowRect(), content, _footerStyle);
@@ -862,6 +917,7 @@ namespace Kingfisher.KSetting
 
             _hasBuiltStyles = true;
             _isStyleDark = IsDark;
+            _stylesVersion++;
 
             _breadcrumbRootStyle = new GUIStyle(EditorStyles.label) { alignment = TextAnchor.MiddleLeft };
             _breadcrumbRootStyle.normal.textColor = GetSkinTextColor(BreadcrumbRootAlpha);
@@ -939,12 +995,20 @@ namespace Kingfisher.KSetting
 
         private static bool IsToolDisabled(KTool tool) => tool.DisabledSetting != null && tool.DisabledSetting.Value;
 
-        private static GUIContent GetSectionTitleContent(string title)
+        private static GUIContent GetSectionTitleContent(string title, out float width)
         {
-            if (SectionTitleContents.TryGetValue(title, out var content)) return content;
+            if (SectionTitleContents.TryGetValue(title, out var entry) && entry.StylesVersion == _stylesVersion)
+            {
+                width = entry.Width;
 
-            content = new GUIContent(title);
-            SectionTitleContents[title] = content;
+                return entry.Content;
+            }
+
+            var content = entry.Content ?? new GUIContent(title);
+
+            width = _sectionStyle.CalcSize(content).x;
+
+            SectionTitleContents[title] = (content, width, _stylesVersion);
 
             return content;
         }
