@@ -16,7 +16,7 @@ namespace Kingfisher.KSetting
 
         private const string MenuTypeNameFormat = "Kingfisher.{0}.{0}Menu, Kingfisher.{0}";
 
-        public static readonly string[] ToolNames = { "KFolders", "KHierarchy", "KInspector", "KFavorites", "KReference", "KTabs", "KEmoji" };
+        public static readonly string[] ToolNames = { "KFolders", "KHierarchy", "KInspector", "KFavorites", "KTabs", "KEmoji" };
 
         private static List<KTool> _installed;
 
