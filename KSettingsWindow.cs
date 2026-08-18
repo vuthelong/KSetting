@@ -15,7 +15,7 @@ namespace Kingfisher.KSetting
 
         private const string MenuPath = "Tools/KTools Setting";
         private const string WindowTitle = "Kingfisher";
-        private const int MenuPriority = 0;
+        private const int MenuPriority = 911;
 
         private const string SelectedToolKey = "Kingfisher.KSetting.SelectedTool";
 
