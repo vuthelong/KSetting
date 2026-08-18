@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-08-19
+
+### Fixed
+
+- The selected tool tab now survives a domain reload instead of snapping
+  back. The selection is kept on the window itself and only falls back to
+  the stored session value when there is nothing to restore.
+
 ## [1.0.3] - 2026-08-18
-
-### Added
-
-- K-Reference now folds its settings into **Tools > KTools Setting**.
 
 ### Changed
 
