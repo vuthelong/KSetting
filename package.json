@@ -1,6 +1,6 @@
 {
   "name": "com.kingfisher.ksetting",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "displayName": "K-Setting",
   "description": "The shared settings backend for the Kingfisher K-Tools. Adds Tools > KTools Setting, finds the installed tools by reflection at load time and folds their settings into one window. Install it alongside any K-Tool. Editor-only: nothing is compiled into player builds.",
   "unity": "2022.3",

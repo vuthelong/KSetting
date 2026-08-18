@@ -37,7 +37,7 @@ git submodule add https://github.com/vuthelong/KSetting.git Assets/ThirdParty/Ki
 Check out a tag to pin a version:
 
 ```
-git -C Assets/ThirdParty/KingfisherTools/KSetting checkout 1.0.2
+git -C Assets/ThirdParty/KingfisherTools/KSetting checkout 1.0.3
 ```
 
 Alternatively, download the `.unitypackage` from the

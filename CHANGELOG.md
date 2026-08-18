@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-08-18
+
 ### Added
 
 - K-Reference now folds its settings into **Tools > KTools Setting**.
+
+### Changed
+
+- Moved the `Tools/KTools Setting` menu item to priority 911, grouping it at
+  the bottom of the Tools menu alongside the other Kingfisher tools' settings
+  items.
 
 ## [1.0.2] - 2026-08-13
 
