@@ -149,7 +149,7 @@ namespace Kingfisher.KSetting
 
         private SearchField _searchField;
         private KTool _selectedTool;
-        private string _selectedToolName;
+        [SerializeField] private string _selectedToolName;
         private string _pendingToolName;
         private string _search = string.Empty;
         private Vector2 _scroll;
@@ -198,7 +198,12 @@ namespace Kingfisher.KSetting
             wantsMouseMove = true;
 
             this._searchField = new SearchField();
-            this._selectedToolName = SessionState.GetString(SelectedToolKey, string.Empty);
+
+            if (string.IsNullOrEmpty(this._selectedToolName))
+            {
+                this._selectedToolName = SessionState.GetString(SelectedToolKey, string.Empty);
+            }
+
             this._hasDataFolder = Directory.Exists(KData.FolderPath);
 
             RebuildFilter();
